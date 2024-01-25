@@ -1,6 +1,6 @@
 package com.example.ezflowscript;
 
-public class TokenType {
-
+enum TokenType {
+    EOF
 
 }
