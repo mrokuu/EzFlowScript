@@ -93,6 +93,30 @@ abstract class Expr {
         }
     }
 
+    static class Literal extends Expr {
+        final Object value;
+
+        Literal(Object value) {
+            this.value = value;
+        }
+
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitLiteralExpr(this);
+        }
+    }
+
+    static class Grouping extends Expr {
+        final Expr expression;
+
+        Grouping(Expr expression) {
+            this.expression = expression;
+        }
+
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitGroupingExpr(this);
+        }
+    }
+
 
 
 
