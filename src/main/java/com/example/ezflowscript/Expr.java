@@ -1,17 +1,51 @@
 package com.example.ezflowscript;
 
-public class Expr {
 
+import java.util.List;
 
-    static class Binary extends Expr {
-        Binary(Expr left, Token operator, Expr right) {
-            this.left = left;
-            this.operator = operator;
-            this.right = right;
+abstract class Expr {
+    Expr() {
+    }
+
+    abstract <R> R accept(Visitor<R> var1);
+
+    static class Variable extends Expr {
+        final Token name;
+
+        Variable(Token name) {
+            this.name = name;
         }
 
-        final Expr left;
-        final Token operator;
-        final Expr right;
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitVariableExpr(this);
+        }
+    }
+
+
+
+    interface Visitor<R> {
+        R visitAssignExpr(Assign var1);
+
+        R visitBinaryExpr(Binary var1);
+
+        R visitCallExpr(Call var1);
+
+        R visitGetExpr(Get var1);
+
+        R visitGroupingExpr(Grouping var1);
+
+        R visitLiteralExpr(Literal var1);
+
+        R visitLogicalExpr(Logical var1);
+
+        R visitSetExpr(Set var1);
+
+        R visitSuperExpr(Super var1);
+
+        R visitThisExpr(This var1);
+
+        R visitUnaryExpr(Unary var1);
+
+        R visitVariableExpr(Variable var1);
     }
 }
