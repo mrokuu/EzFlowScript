@@ -61,6 +61,22 @@ abstract class Expr {
         }
     }
 
+    static class Set extends Expr {
+        final Expr object;
+        final Token name;
+        final Expr value;
+
+        Set(Expr object, Token name, Expr value) {
+            this.object = object;
+            this.name = name;
+            this.value = value;
+        }
+
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitSetExpr(this);
+        }
+    }
+
 
 
 
