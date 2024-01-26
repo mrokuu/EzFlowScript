@@ -29,12 +29,14 @@ public class GenerateAst {
         writer.println("import java.util.List;");
         writer.println();
         writer.println("abstract class " + baseName + "{");
+        defineVisitor(writer, baseName, types);
         Iterator var5 = types.iterator();
 
         while(var5.hasNext()) {
             String type = (String)var5.next();
             String className = type.split(":")[0].trim();
             String fields = type.split(":")[1].trim();
+            defineType(writer, baseName, className, fields);
         }
 
         writer.println();
@@ -43,5 +45,50 @@ public class GenerateAst {
         writer.close();
     }
 
+    private static void defineVisitor(PrintWriter writer, String baseName, List<String> types) {
+        writer.println("  interface Visitor<R> {");
+        Iterator var3 = types.iterator();
 
+        while(var3.hasNext()) {
+            String type = (String)var3.next();
+            String typeName = type.split(":")[0].trim();
+            writer.println("  R visit" + typeName + baseName + "(" + typeName + " " + baseName.toLowerCase() + ");");
+        }
+
+        writer.println("  }");
+    }
+
+    private static void defineType(PrintWriter writer, String baseName, String className, String fieldList) {
+        writer.println("static class " + className + " extends " + baseName + " {");
+        writer.println("  " + className + "(" + fieldList + ") {");
+        String[] fields = fieldList.split(", ");
+        String[] var5 = fields;
+        int var6 = fields.length;
+
+        int var7;
+        String field;
+        for(var7 = 0; var7 < var6; ++var7) {
+            field = var5[var7];
+            String name = field.split(" ")[1];
+            writer.println("  this." + name + " = " + name + ";");
+        }
+
+        writer.println("  }");
+        writer.println();
+        var5 = fields;
+        var6 = fields.length;
+
+        for(var7 = 0; var7 < var6; ++var7) {
+            field = var5[var7];
+            writer.println("  final " + field + ";");
+        }
+
+        writer.println();
+        writer.println();
+        writer.println("  @Override");
+        writer.println("  <R> R accept(Visitor<R> visitor) {");
+        writer.println("    return visitor.visit" + className + baseName + "(this);");
+        writer.println("    }");
+        writer.println("  }");
+    }
 }
