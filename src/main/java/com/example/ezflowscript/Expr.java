@@ -21,6 +21,20 @@ abstract class Expr {
         }
     }
 
+    static class Unary extends Expr {
+        final Token operator;
+        final Expr right;
+
+        Unary(Token operator, Expr right) {
+            this.operator = operator;
+            this.right = right;
+        }
+
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitUnaryExpr(this);
+        }
+    }
+
 
 
     interface Visitor<R> {
