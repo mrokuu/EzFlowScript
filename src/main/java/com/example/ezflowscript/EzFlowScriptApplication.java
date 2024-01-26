@@ -1,6 +1,5 @@
 package com.example.ezflowscript;
 
-import ch.qos.logback.core.subst.Token;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -13,26 +12,24 @@ import java.util.List;
 
 
 public class EzFlowScriptApplication {
-
     static boolean hadError = false;
-
     public static void main(String[] args) throws IOException {
-        if (args.length>1){
-            System.out.println("Useage: EzFlowScript");
+        if (args.length > 1) {
+            System.out.println("Usage: app [script]");
             System.exit(64);
-        } else if (args.length == 1){
+        }else if (args.length == 1) {
             runFile(args[0]);
-        } else {
+        }else {
             runPrompt();
         }
-
     }
 
     private static void runFile(String path) throws IOException {
         byte[] bytes = Files.readAllBytes(Paths.get(path));
         run(new String(bytes, Charset.defaultCharset()));
-    }
 
+        if (hadError) System.exit(65);
+    }
 
     private static void runPrompt() throws IOException {
         InputStreamReader input = new InputStreamReader(System.in);
@@ -43,6 +40,7 @@ public class EzFlowScriptApplication {
             String line = reader.readLine();
             if (line == null) break;
             run(line);
+            hadError = false;
         }
     }
 
@@ -50,8 +48,7 @@ public class EzFlowScriptApplication {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
 
-        // For now, just print the tokens.
-        for (Token token : tokens) {
+        for (Token token: tokens) {
             System.out.println(token);
         }
     }
@@ -60,13 +57,7 @@ public class EzFlowScriptApplication {
         report(line, "", message);
     }
 
-    private static void report(int line, String where,
-                               String message) {
-        System.err.println(
-                "[line " + line + "] Error" + where + ": " + message);
-        hadError = true;
+    private static void report(int line, String where, String message) {
+        System.err.println("[line " + line + "] Error" + where + ": " + message);
     }
-
-
-
 }
