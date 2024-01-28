@@ -123,7 +123,7 @@ public class Scanner {
                 } else if (isAlpha(c)) {
                     identifer();
                 } else {
-                    Lox.error(line, "Unexpected Character");
+                    EzFlowScriptApplication.error(line, "Unexpected Character");
                 }
                 break;
         }
@@ -147,7 +147,7 @@ public class Scanner {
             }
         }
         if (isAtEnd() && in_comment) {
-            Lox.error(line, "Dangling comment");
+            EzFlowScriptApplication.error(line, "Dangling comment");
         }
     }
     private void identifer() {

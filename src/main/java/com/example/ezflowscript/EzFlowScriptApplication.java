@@ -15,7 +15,7 @@ public class EzFlowScriptApplication {
     static boolean hadError = false;
     public static void main(String[] args) throws IOException {
         if (args.length > 1) {
-            System.out.println("Usage: app [script]");
+            System.out.println("Usage: jlox [script]");
             System.exit(64);
         }else if (args.length == 1) {
             runFile(args[0]);
@@ -48,9 +48,13 @@ public class EzFlowScriptApplication {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
 
-        for (Token token: tokens) {
-            System.out.println(token);
-        }
+        Parser parser = new Parser(tokens);
+        Expr expression = parser.parse();
+
+        // Stop if there was a syntax error
+        if (hadError) return;
+
+        System.out.println(new AstPrinter().print(expression));
     }
 
     static void error(int line, String message) {
@@ -59,5 +63,13 @@ public class EzFlowScriptApplication {
 
     private static void report(int line, String where, String message) {
         System.err.println("[line " + line + "] Error" + where + ": " + message);
+    }
+
+    static void error(Token token, String message) {
+        if (token.type == TokenType.EOF) {
+            EzFlowScriptApplication.report(token.line, " at end", message);
+        } else {
+            EzFlowScriptApplication.report(token.line, " at '" + token.lexeme + "'", message);
+        }
     }
 }
