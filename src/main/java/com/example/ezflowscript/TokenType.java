@@ -41,6 +41,6 @@ enum TokenType {
     WHILE,
     EOF;
 
-    private TokenType() {
+     TokenType() {
     }
 }

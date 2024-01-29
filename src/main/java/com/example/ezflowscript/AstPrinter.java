@@ -1,5 +1,15 @@
 package com.example.ezflowscript;
 
+
+import com.example.ezflowscript.Expr;
+import com.example.ezflowscript.Token;
+import com.example.ezflowscript.TokenType;
+import com.example.ezflowscript.Expr.Binary;
+import com.example.ezflowscript.Expr.Grouping;
+import com.example.ezflowscript.Expr.Literal;
+import com.example.ezflowscript.Expr.Unary;
+import com.example.ezflowscript.Expr.Visitor;
+
 class AstPrinter implements Expr.Visitor<String>{
     public static void main(String[] args) {
         Expr expression = new Expr.Binary(
@@ -22,6 +32,12 @@ class AstPrinter implements Expr.Visitor<String>{
     String print(Expr expr) {
         return expr.accept(this);
     }
+
+    @Override
+    public String visitAssignExpr(Expr.Assign expr) {
+        return null;
+    }
+
     @Override
     public String visitBinaryExpr(Expr.Binary expr) {
         return parenthesize(expr.operator.lexeme, expr.left, expr.right);
@@ -41,6 +57,11 @@ class AstPrinter implements Expr.Visitor<String>{
     @Override
     public String visitUnaryExpr(Expr.Unary expr) {
         return parenthesize(expr.operator.lexeme, expr.right);
+    }
+
+    @Override
+    public String visitVariableExpr(Expr.Variable expr) {
+        return null;
     }
 
     // RPN parenthesize
