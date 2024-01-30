@@ -10,7 +10,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         try {
             for (Stmt statement: statements) {
                 execute(statement);
-                // System.out.println(statement.toString());
+
             }
         } catch (RuntimeError error) {
             EzFlowScriptApplication.runtimeError(error);
