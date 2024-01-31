@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 public class EzFlowScriptClass implements EzFlowScriptCallable  {
-
     final String name;
     private final Map<String, EzFlowScriptFunction> methods;
 
