@@ -5,42 +5,46 @@ import java.util.List;
 public class EzFlowScriptFunction implements EzFlowScriptCallable {
 
     private final Environment closure;
-
     private final Stmt.Function declaration;
+    private final boolean isInitializer;
 
-    EzFlowScriptFunction(Stmt.Function declaration, Environment closure) {
-        // closure is nothing but a reference to the environment
-        // that was active during function declaration, not when it got called.
+    EzFlowScriptFunction(Stmt.Function declaration, Environment closure, boolean isInitializer) {
+        this.isInitializer = isInitializer;
         this.closure = closure;
         this.declaration = declaration;
     }
 
-    @Override
-    public Object call(Interpreter interpreter, List<Object> arguments) {
-        // we chain up the new environment to the environment present at
-        // time of function declaration, i.e closure.
-        Environment environment = new Environment(closure);
+    EzFlowScriptFunction bind(EzFlowScriptInstance instance) {
+        Environment environment = new Environment(this.closure);
+        environment.define("this", instance);
+        return new EzFlowScriptFunction(this.declaration, environment, this.isInitializer);
+    }
 
-        for (int i = 0; i< declaration.params.size(); i++ ) {
-            environment.define(declaration.params.get(i).lexeme,
-                    arguments.get(i));
+    public Object call(Interpreter interpreter, List<Object> arguments) {
+        Environment environment = new Environment(this.closure);
+
+        for(int i = 0; i < this.declaration.params.size(); ++i) {
+            environment.define(((Token)this.declaration.params.get(i)).lexeme, arguments.get(i));
         }
 
         try {
-            interpreter.executeBlock(declaration.body, environment);
-        } catch (Return returnValue) {
-            return returnValue.value;
+            interpreter.executeBlock(this.declaration.body, environment);
+        } catch (Return var5) {
+            if (this.isInitializer) {
+                return this.closure.getAt(0, "this");
+            }
+
+            return var5.value;
         }
-        return null;
+
+        return this.isInitializer ? this.closure.getAt(0, "this") : null;
     }
 
-    @Override
     public int arity() {
-        return declaration.params.size();
+        return this.declaration.params.size();
     }
 
-    @Override
     public String toString() {
-        return "<fn " + declaration.name.lexeme + ">";
+        return "<fn " + this.declaration.name.lexeme + ">";
     }
 }

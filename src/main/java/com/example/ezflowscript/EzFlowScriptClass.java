@@ -5,34 +5,39 @@ import java.util.Map;
 
 public class EzFlowScriptClass implements EzFlowScriptCallable  {
     final String name;
+    final EzFlowScriptClass superClass;
     private final Map<String, EzFlowScriptFunction> methods;
 
-    EzFlowScriptClass(String name, Map<String, EzFlowScriptFunction> methods) {
+    EzFlowScriptClass(String name, EzFlowScriptClass superClass, Map<String, EzFlowScriptFunction> methods) {
         this.name = name;
+        this.superClass = superClass;
         this.methods = methods;
     }
 
     EzFlowScriptFunction findMethod(String name) {
-        if (methods.containsKey(name)) {
-            return methods.get(name);
+        if (this.methods.containsKey(name)) {
+            return (EzFlowScriptFunction)this.methods.get(name);
+        } else {
+            return this.superClass != null ? this.superClass.findMethod(name) : null;
         }
-
-        return null;
     }
 
-    @Override
     public Object call(Interpreter interpreter, List<Object> arguments) {
         EzFlowScriptInstance instance = new EzFlowScriptInstance(this);
+        EzFlowScriptFunction initializer = this.findMethod("init");
+        if (initializer != null) {
+            initializer.bind(instance).call(interpreter, arguments);
+        }
+
         return instance;
     }
 
-    @Override
     public int arity() {
-        return 0;
+        EzFlowScriptFunction initializer = this.findMethod("init");
+        return initializer == null ? 0 : initializer.arity();
     }
 
-    @Override
     public String toString() {
-        return name + " class";
+        return this.name + " class";
     }
 }

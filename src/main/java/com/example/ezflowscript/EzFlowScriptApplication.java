@@ -15,33 +15,46 @@ public class EzFlowScriptApplication {
     private static final Interpreter interpreter = new Interpreter();
     static boolean hadError = false;
     static boolean hadRuntimeError = false;
+
+    public EzFlowScriptApplication() {
+    }
+
     public static void main(String[] args) throws IOException {
         if (args.length > 1) {
             System.out.println("Usage: jlox [script]");
             System.exit(64);
-        }else if (args.length == 1) {
+        } else if (args.length == 1) {
             runFile(args[0]);
-        }else {
+        } else {
             runPrompt();
         }
+
     }
 
     private static void runFile(String path) throws IOException {
         byte[] bytes = Files.readAllBytes(Paths.get(path));
         run(new String(bytes, Charset.defaultCharset()));
+        if (hadError) {
+            System.exit(65);
+        }
 
-        if (hadError) System.exit(65);
-        if (hadRuntimeError) System.exit(70);
+        if (hadRuntimeError) {
+            System.exit(70);
+        }
+
     }
 
     private static void runPrompt() throws IOException {
         InputStreamReader input = new InputStreamReader(System.in);
         BufferedReader reader = new BufferedReader(input);
 
-        for (;;) {
+        while(true) {
             System.out.print("> ");
             String line = reader.readLine();
-            if (line == null) break;
+            if (line == null) {
+                return;
+            }
+
             run(line);
             hadError = false;
         }
@@ -50,14 +63,15 @@ public class EzFlowScriptApplication {
     private static void run(String source) {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
-
         Parser parser = new Parser(tokens);
         List<Stmt> statements = parser.parse();
-
-        // Stop if there was a syntax error
-        if (hadError) return;
-
-        interpreter.interpret(statements);
+        if (!hadError) {
+            Resolver resolver = new Resolver(interpreter);
+            resolver.resolve(statements);
+            if (!hadError) {
+                interpreter.interpret(statements);
+            }
+        }
     }
 
     static void error(int line, String message) {
@@ -70,14 +84,17 @@ public class EzFlowScriptApplication {
 
     static void error(Token token, String message) {
         if (token.type == TokenType.EOF) {
-            EzFlowScriptApplication.report(token.line, " at end", message);
+            report(token.line, " at end", message);
         } else {
-            EzFlowScriptApplication.report(token.line, " at '" + token.lexeme + "'", message);
+            report(token.line, " at '" + token.lexeme + "'", message);
         }
+
     }
 
     static void runtimeError(RuntimeError error) {
-        System.err.println(error.getMessage() + "\n[line " + error.token.line + "]");
+        PrintStream var10000 = System.err;
+        String var10001 = error.getMessage();
+        var10000.println(var10001 + "\n[line " + error.token.line + "]");
         hadRuntimeError = true;
     }
 }

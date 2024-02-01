@@ -7,7 +7,6 @@ import static com.example.ezflowscript.TokenType.*;
 
 
 class Parser {
-    private static class ParseError extends RuntimeException{}
     private final List<Token> tokens;
     private int current = 0;
 
@@ -16,370 +15,406 @@ class Parser {
     }
 
     List<Stmt> parse() {
-        List<Stmt> statements = new ArrayList<>();
-        while (!isAtEnd()) {
-            statements.add(declaration());
+        List<Stmt> statements = new ArrayList();
+
+        while(!this.isAtEnd()) {
+            statements.add(this.declaration());
         }
 
         return statements;
     }
 
     private Expr expression() {
-        return assignment();
+        return this.assignment();
     }
 
     private Stmt declaration() {
         try {
-            if (match(VAR)) return varDeclaration();
-
-            return statement();
-        } catch (ParseError error) {
-            synchronize();
+            return this.match(TokenType.VAR) ? this.varDeclaration() : this.statement();
+        } catch (ParseError var2) {
+            this.synchronize();
             return null;
         }
     }
 
     private Stmt classDeclaration() {
-        Token name = consume(IDENTIFIER, "Expect class name.");
-        consume(LEFT_BRACE, "Expect '{' before class body.");
-
-        List<Stmt.Function> methods = new ArrayList<>();
-        while (!check(RIGHT_BRACE) && !isAtEnd()) {
-            methods.add(function("method"));
+        Token name = this.consume(TokenType.IDENTIFIER, "Expect class name.");
+        Expr.Variable superclass = null;
+        if (this.match(TokenType.LESS)) {
+            this.consume(TokenType.IDENTIFIER, "Expect superclass name.");
+            superclass = new Expr.Variable(this.previous());
         }
 
-        consume(RIGHT_BRACE, "Expect '}' after class body.");
+        this.consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
+        List<Stmt.Function> methods = new ArrayList();
 
-        return new Stmt.Class(name, methods);
+        while(!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+            methods.add(this.function("method"));
+        }
+
+        this.consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
+        return new Stmt.Class(name, superclass, methods);
     }
+
     private Stmt statement() {
-        if (match(CLASS)) return classDeclaration();
-        if (match(FUN)) return function("function");
-        if (match(FOR)) return forStatement();
-        if (match(IF)) return ifStatement();
-        if (match(PRINT)) return printStatement();
-        if (match(RETURN)) return returnStatement();
-        if (match(WHILE)) return whileStatement();
-        if (match(LEFT_BRACE)) return new Stmt.Block(block());
-        return expressionStatement();
+        if (this.match(TokenType.CLASS)) {
+            return this.classDeclaration();
+        } else if (this.match(TokenType.FUN)) {
+            return this.function("function");
+        } else if (this.match(TokenType.FOR)) {
+            return this.forStatement();
+        } else if (this.match(TokenType.IF)) {
+            return this.ifStatement();
+        } else if (this.match(TokenType.PRINT)) {
+            return this.printStatement();
+        } else if (this.match(TokenType.RETURN)) {
+            return this.returnStatement();
+        } else if (this.match(TokenType.WHILE)) {
+            return this.whileStatement();
+        } else {
+            return (Stmt)(this.match(TokenType.LEFT_BRACE) ? new Stmt.Block(this.block()) : this.expressionStatement());
+        }
     }
 
     private Stmt forStatement() {
-        consume(LEFT_PAREN, "Expect '(' after 'for'.");
+        this.consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'.");
         Stmt initializer;
-        if (match(SEMICOLON)) {
+        if (this.match(TokenType.SEMICOLON)) {
             initializer = null;
-        } else if (match(VAR)) {
-            initializer = varDeclaration();
+        } else if (this.match(TokenType.VAR)) {
+            initializer = this.varDeclaration();
         } else {
-            initializer = expressionStatement();
+            initializer = this.expressionStatement();
         }
 
         Expr condition = null;
-        if (!check(SEMICOLON)) {
-            condition = expression();
+        if (!this.check(TokenType.SEMICOLON)) {
+            condition = this.expression();
         }
-        consume(SEMICOLON, "Expect ';' after loop condition.");
 
+        this.consume(TokenType.SEMICOLON, "Expect ';' after loop condition.");
         Expr increment = null;
-        if (!check(RIGHT_PAREN)) {
-            increment = expression();
+        if (!this.check(TokenType.RIGHT_PAREN)) {
+            increment = this.expression();
         }
-        consume(RIGHT_PAREN, "Expect ')' after for clauses.");
 
-        Stmt body = statement();
+        this.consume(TokenType.RIGHT_PAREN, "Expect ')' after for clauses.");
+        Stmt body = this.statement();
         if (increment != null) {
-            body = new Stmt.Block(
-                    Arrays.asList(
-                            body,
-                            new Stmt.Expression(increment)));
+            body = new Stmt.Block(Arrays.asList((Stmt)body, new Stmt.Expression(increment)));
         }
-        if (condition == null) condition = new Expr.Literal(true);
-        body = new Stmt.While(condition, body);
+
+        if (condition == null) {
+            condition = new Expr.Literal(true);
+        }
+
+        body = new Stmt.While((Expr)condition, (Stmt)body);
         if (initializer != null) {
-            body = new Stmt.Block(Arrays.asList(initializer, body));
+            body = new Stmt.Block(Arrays.asList(initializer, (Stmt)body));
         }
-        return body;
+
+        return (Stmt)body;
     }
 
     private Stmt ifStatement() {
-        consume(LEFT_PAREN, "Expect '(' after 'if'.");
-        Expr condition = expression();
-        consume(RIGHT_PAREN, "Expect ')' after if condition.");
-
-        Stmt thenBranch = statement();
+        this.consume(TokenType.LEFT_PAREN, "Expect '(' after 'if'.");
+        Expr condition = this.expression();
+        this.consume(TokenType.RIGHT_PAREN, "Expect ')' after if condition.");
+        Stmt thenBranch = this.statement();
         Stmt elseBranch = null;
-        if (match(ELSE)) {
-            elseBranch = statement();
+        if (this.match(TokenType.ELSE)) {
+            elseBranch = this.statement();
         }
 
         return new Stmt.If(condition, thenBranch, elseBranch);
     }
 
     private Stmt printStatement() {
-        Expr value = expression();
-        consume(SEMICOLON, "Expect ';' after value.");
+        Expr value = this.expression();
+        this.consume(TokenType.SEMICOLON, "Expect ';' after value.");
         return new Stmt.Print(value);
     }
 
     private Stmt returnStatement() {
-        Token keyword = previous();
+        Token keyword = this.previous();
         Expr value = null;
-        if (!check(SEMICOLON)) {
-            value = expression();
+        if (!this.check(TokenType.SEMICOLON)) {
+            value = this.expression();
         }
 
-        consume(SEMICOLON, "Expect ';' after return value.");
+        this.consume(TokenType.SEMICOLON, "Expect ';' after return value.");
         return new Stmt.Return(keyword, value);
     }
 
     private Stmt varDeclaration() {
-        Token name = consume(IDENTIFIER, "Expect variable name ");
-
+        Token name = this.consume(TokenType.IDENTIFIER, "Expect variable name ");
         Expr initializer = null;
-        if (match(EQUAL)) {
-            initializer = expression();
+        if (this.match(TokenType.EQUAL)) {
+            initializer = this.expression();
         }
 
-        consume(SEMICOLON, "Expect ';' after variable declaration ");
+        this.consume(TokenType.SEMICOLON, "Expect ';' after variable declaration ");
         return new Stmt.Var(name, initializer);
     }
 
     private Stmt whileStatement() {
-        consume(LEFT_PAREN, "Expect '(' after 'while'.");
-        Expr condition = expression();
-
-        consume(RIGHT_PAREN, "Expect ')' after condition.");
-
-        Stmt body = statement();
-
+        this.consume(TokenType.LEFT_PAREN, "Expect '(' after 'while'.");
+        Expr condition = this.expression();
+        this.consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.");
+        Stmt body = this.statement();
         return new Stmt.While(condition, body);
     }
 
     private Stmt expressionStatement() {
-        Expr expr = expression();
-        consume(SEMICOLON, "Expect ';' after expression.");
+        Expr expr = this.expression();
+        this.consume(TokenType.SEMICOLON, "Expect ';' after expression.");
         return new Stmt.Expression(expr);
     }
 
     private Stmt.Function function(String kind) {
-        Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
-
-        consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
-        List<Token> parameters = new ArrayList<>();
-        if (!check(RIGHT_PAREN)) {
+        Token name = this.consume(TokenType.IDENTIFIER, "Expect " + kind + " name.");
+        this.consume(TokenType.LEFT_PAREN, "Expect '(' after " + kind + " name.");
+        List<Token> parameters = new ArrayList();
+        if (!this.check(TokenType.RIGHT_PAREN)) {
             do {
                 if (parameters.size() >= 255) {
-                    error(peek(), "Can't have more than 255 parameters.");
+                    this.error(this.peek(), "Can't have more than 255 parameters.");
                 }
 
-                parameters.add(
-                        consume(IDENTIFIER, "Expect parameter name."));
-            } while (match(COMMA));
+                parameters.add(this.consume(TokenType.IDENTIFIER, "Expect parameter name."));
+            } while(this.match(TokenType.COMMA));
         }
-        consume(RIGHT_PAREN, "Expect ')' after parameters.");
-    /*Note that we consume the { at the beginning of the body here before calling block().
-      That’s because block() assumes the brace token has already been matched. */
-        consume(LEFT_BRACE, "Expect '{' brefore " + kind + " body");
-        List<Stmt> body = block();
+
+        this.consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters.");
+        this.consume(TokenType.LEFT_BRACE, "Expect '{' brefore " + kind + " body");
+        List<Stmt> body = this.block();
         return new Stmt.Function(name, parameters, body);
     }
 
     private List<Stmt> block() {
-        List<Stmt> statements = new ArrayList<>();
+        List<Stmt> statements = new ArrayList();
 
-        while (!check(RIGHT_BRACE) && !isAtEnd()) {
-            statements.add(declaration());
+        while(!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+            statements.add(this.declaration());
         }
-        consume(RIGHT_BRACE, "Expect '}' after block.");
+
+        this.consume(TokenType.RIGHT_BRACE, "Expect '}' after block.");
         return statements;
     }
 
     private Expr assignment() {
-        Expr expr = or();
-
-        if (match(EQUAL)) {
-            Token equals = previous();
-            Expr value = assignment();
-
+        Expr expr = this.or();
+        if (this.match(TokenType.EQUAL)) {
+            Token equals = this.previous();
+            Expr value = this.assignment();
             if (expr instanceof Expr.Variable) {
                 Token name = ((Expr.Variable)expr).name;
                 return new Expr.Assign(name, value);
-            } else if (expr instanceof Expr.Get) {
+            }
+
+            if (expr instanceof Expr.Get) {
                 Expr.Get get = (Expr.Get)expr;
                 return new Expr.Set(get.object, get.name, value);
             }
 
-            error(equals, "Invalid assignment target.");
+            this.error(equals, "Invalid assignment target.");
         }
 
         return expr;
     }
 
     private Expr or() {
-        Expr expr = and();
-
-        while (match(OR)) {
-            Token operator = previous();
-            Expr right = and();
-            expr = new Expr.Logical(expr, operator, right);
+        Object expr;
+        Token operator;
+        Expr right;
+        for(expr = this.and(); this.match(TokenType.OR); expr = new Expr.Logical((Expr)expr, operator, right)) {
+            operator = this.previous();
+            right = this.and();
         }
-        return expr;
+
+        return (Expr)expr;
     }
 
     private Expr and() {
-        Expr expr = equality();
-
-        while (match(AND)) {
-            Token operator = previous();
-            Expr right = equality();
-            expr = new Expr.Logical(expr, operator, right);
+        Object expr;
+        Token operator;
+        Expr right;
+        for(expr = this.equality(); this.match(TokenType.AND); expr = new Expr.Logical((Expr)expr, operator, right)) {
+            operator = this.previous();
+            right = this.equality();
         }
-        return expr;
+
+        return (Expr)expr;
     }
-    private Expr equality() {
-        Expr expr = comparison();
 
-        while (match(BANG_EQUAL, EQUAL_EQUAL)) {
-            Token operator = previous();
-            Expr right = comparison();
-            expr = new Expr.Binary(expr, operator, right);
+    private Expr equality() {
+        Object expr;
+        Token operator;
+        Expr right;
+        for(expr = this.comparison(); this.match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL); expr = new Expr.Binary((Expr)expr, operator, right)) {
+            operator = this.previous();
+            right = this.comparison();
         }
 
-        return expr;
+        return (Expr)expr;
     }
 
     private Expr comparison() {
-        Expr expr = term();
-
-        while (match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)) {
-            Token operator = previous();
-            Expr right = term();
-            expr = new Expr.Binary(expr, operator, right);
+        Object expr;
+        Token operator;
+        Expr right;
+        for(expr = this.term(); this.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL); expr = new Expr.Binary((Expr)expr, operator, right)) {
+            operator = this.previous();
+            right = this.term();
         }
 
-        return expr;
+        return (Expr)expr;
     }
 
     private Expr term() {
-        Expr expr = factor();
-
-        while (match(MINUS, PLUS)) {
-            Token operator = previous();
-            Expr right = factor();
-            expr = new Expr.Binary(expr, operator, right);
+        Object expr;
+        Token operator;
+        Expr right;
+        for(expr = this.factor(); this.match(TokenType.MINUS, TokenType.PLUS); expr = new Expr.Binary((Expr)expr, operator, right)) {
+            operator = this.previous();
+            right = this.factor();
         }
 
-        return expr;
+        return (Expr)expr;
     }
 
-
     private Expr factor() {
-        Expr expr = unary();
-
-        while (match(SLASH, STAR)) {
-            Token operator = previous();
-            Expr right = unary();
-            expr = new Expr.Binary(expr, operator, right);
+        Object expr;
+        Token operator;
+        Expr right;
+        for(expr = this.unary(); this.match(TokenType.SLASH, TokenType.STAR); expr = new Expr.Binary((Expr)expr, operator, right)) {
+            operator = this.previous();
+            right = this.unary();
         }
 
-        return expr;
+        return (Expr)expr;
     }
 
     private Expr unary() {
-        if (match(BANG, MINUS)) {
-            Token operator = previous();
-            Expr right = unary();
+        if (this.match(TokenType.BANG, TokenType.MINUS)) {
+            Token operator = this.previous();
+            Expr right = this.unary();
             return new Expr.Unary(operator, right);
         } else {
-            return call();
+            return this.call();
         }
     }
 
     private Expr finishCall(Expr callee) {
-        List<Expr> arguments = new ArrayList<>();
-        if (!check(RIGHT_PAREN)) {
+        List<Expr> arguments = new ArrayList();
+        if (!this.check(TokenType.RIGHT_PAREN)) {
             do {
                 if (arguments.size() >= 255) {
-                    error(peek(), "Can't have more than 255 arguments.");
+                    this.error(this.peek(), "Can't have more than 255 arguments.");
                 }
-                arguments.add(expression());
-            } while (match(COMMA));
+
+                arguments.add(this.expression());
+            } while(this.match(TokenType.COMMA));
         }
 
-        Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");
+        Token paren = this.consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
         return new Expr.Call(callee, paren, arguments);
     }
+
     private Expr call() {
-        Expr expr = primary();
+        Expr expr = this.primary();
 
-        while (true) {
-            if (match(LEFT_PAREN)) {
-                expr = finishCall(expr);
-            } else if (match(DOT)) {
-                Token name = consume(IDENTIFIER, "Expect property name after '.' .");
-                expr = new Expr.Get(expr, name);
+        while(true) {
+            while(!this.match(TokenType.LEFT_PAREN)) {
+                if (!this.match(TokenType.DOT)) {
+                    return (Expr)expr;
+                }
+
+                Token name = this.consume(TokenType.IDENTIFIER, "Expect property name after '.' .");
+                expr = new Expr.Get((Expr)expr, name);
             }
-            else {
-                break;
-            }
+
+            expr = this.finishCall((Expr)expr);
         }
-
-        return expr;
     }
-    private Expr primary() {
-        if (match(NUMBER, STRING)) {
-            return new Expr.Literal(previous().literal);
-        }
-        if (match(IDENTIFIER)) return new Expr.Variable(previous());
-        if (match(TRUE)) return  new Expr.Literal(true);
-        if (match(FALSE)) return new Expr.Literal(false);
-        if (match(NIL)) return new Expr.Literal(null);
 
-        if (match(LEFT_PAREN)) {
-            Expr expr = expression();
-            consume(RIGHT_PAREN, "Expect ')' after expression.");
+    private Expr primary() {
+        if (this.match(TokenType.NUMBER, TokenType.STRING)) {
+            return new Expr.Literal(this.previous().literal);
+        } else if (this.match(TokenType.SUPER)) {
+            Token keyword = this.previous();
+            this.consume(TokenType.DOT, "Expect '.' after 'super'.");
+            Token method = this.consume(TokenType.IDENTIFIER, "Expect superclass method name.");
+            return new Expr.Super(keyword, method);
+        } else if (this.match(TokenType.THIS)) {
+            return new Expr.This(this.previous());
+        } else if (this.match(TokenType.IDENTIFIER)) {
+            return new Expr.Variable(this.previous());
+        } else if (this.match(TokenType.TRUE)) {
+            return new Expr.Literal(true);
+        } else if (this.match(TokenType.FALSE)) {
+            return new Expr.Literal(false);
+        } else if (this.match(TokenType.NIL)) {
+            return new Expr.Literal((Object)null);
+        } else if (this.match(TokenType.LEFT_PAREN)) {
+            Expr expr = this.expression();
+            this.consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
+        } else {
+            throw this.error(this.peek(), "Expect Expression");
         }
-        throw error(peek(), "Expect Expression");
     }
 
     private boolean match(TokenType... types) {
-        for (TokenType type: types) {
-            if (check(type)) {
-                advance();
+        TokenType[] var2 = types;
+        int var3 = types.length;
+
+        for(int var4 = 0; var4 < var3; ++var4) {
+            TokenType type = var2[var4];
+            if (this.check(type)) {
+                this.advance();
                 return true;
             }
         }
+
         return false;
     }
+
     private Token consume(TokenType type, String message) {
-        if (check(type)) return advance();
-        throw error(peek(), message);
+        if (this.check(type)) {
+            return this.advance();
+        } else {
+            throw this.error(this.peek(), message);
+        }
     }
 
     private boolean check(TokenType type) {
-        if (isAtEnd()) return false;
-        return peek().type == type;
+        if (this.isAtEnd()) {
+            return false;
+        } else {
+            return this.peek().type == type;
+        }
     }
 
     private Token advance() {
-        if (!isAtEnd()) current++;
-        return previous();
+        if (!this.isAtEnd()) {
+            ++this.current;
+        }
+
+        return this.previous();
     }
 
     private boolean isAtEnd() {
-        return peek().type == EOF;
+        return this.peek().type == TokenType.EOF;
     }
 
     private Token peek() {
-        return tokens.get(current);
+        return (Token)this.tokens.get(this.current);
     }
 
     private Token previous() {
-        return tokens.get(current - 1);
+        return (Token)this.tokens.get(this.current - 1);
     }
-
 
     private ParseError error(Token token, String message) {
         EzFlowScriptApplication.error(token, message);
@@ -387,12 +422,14 @@ class Parser {
     }
 
     private void synchronize() {
-        advance();
+        this.advance();
 
-        while (!isAtEnd()) {
-            if (previous().type == SEMICOLON) return;
+        while(!this.isAtEnd()) {
+            if (this.previous().type == TokenType.SEMICOLON) {
+                return;
+            }
 
-            switch (peek().type) {
+            switch (this.peek().type) {
                 case CLASS:
                 case FUN:
                 case VAR:
@@ -402,9 +439,15 @@ class Parser {
                 case PRINT:
                 case RETURN:
                     return;
+                default:
+                    this.advance();
             }
+        }
 
-            advance();
+    }
+
+    private static class ParseError extends RuntimeException {
+        private ParseError() {
         }
     }
 }

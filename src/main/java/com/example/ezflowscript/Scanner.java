@@ -7,13 +7,236 @@ import java.util.Map;
 
 public class Scanner {
     private final String source;
-    private final List<Token> tokens = new ArrayList<>();
+    private final List<Token> tokens = new ArrayList();
     private int start = 0;
     private int current = 0;
     private int line = 1;
-    private static final Map<String, TokenType> keywords;
+    private static final Map<String, TokenType> keywords = new HashMap();
+
+    Scanner(String source) {
+        this.source = source;
+    }
+
+    List<Token> scanTokens() {
+        while(!this.isAtEnd()) {
+            this.start = this.current;
+            this.scanToken();
+        }
+
+        this.tokens.add(new Token(TokenType.EOF, "", (Object)null, this.line));
+        return this.tokens;
+    }
+
+    private void scanToken() {
+        char c = this.advance();
+        switch (c) {
+            case '\t':
+            case '\r':
+            case ' ':
+                break;
+            case '\n':
+                ++this.line;
+                break;
+            case '!':
+                this.addToken(this.match('=') ? TokenType.BANG_EQUAL : TokenType.BANG);
+                break;
+            case '"':
+                this.string();
+                break;
+            case '(':
+                this.addToken(TokenType.LEFT_PAREN);
+                break;
+            case ')':
+                this.addToken(TokenType.RIGHT_PAREN);
+                break;
+            case '*':
+                this.addToken(TokenType.STAR);
+                break;
+            case '+':
+                this.addToken(TokenType.PLUS);
+                break;
+            case ',':
+                this.addToken(TokenType.COMMA);
+                break;
+            case '-':
+                this.addToken(TokenType.MINUS);
+                break;
+            case '.':
+                this.addToken(TokenType.DOT);
+                break;
+            case '/':
+                if (this.match('/')) {
+                    while(this.peek() != '\n' && !this.isAtEnd()) {
+                        this.advance();
+                    }
+
+                    return;
+                } else {
+                    if (this.match('*')) {
+                        this.ccoment();
+                    } else {
+                        this.addToken(TokenType.SLASH);
+                    }
+                    break;
+                }
+            case ';':
+                this.addToken(TokenType.SEMICOLON);
+                break;
+            case '<':
+                this.addToken(this.match('=') ? TokenType.LESS_EQUAL : TokenType.LESS);
+                break;
+            case '=':
+                this.addToken(this.match('=') ? TokenType.EQUAL_EQUAL : TokenType.EQUAL);
+                break;
+            case '>':
+                this.addToken(this.match('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER);
+                break;
+            case '{':
+                this.addToken(TokenType.LEFT_BRACE);
+                break;
+            case '}':
+                this.addToken(TokenType.RIGHT_BRACE);
+                break;
+            default:
+                if (this.isDigit(c)) {
+                    this.number();
+                } else if (this.isAlpha(c)) {
+                    this.identifer();
+                } else {
+                    EzFlowScriptApplication.error(this.line, "Unexpected Character");
+                }
+        }
+
+    }
+
+    private void ccoment() {
+        boolean in_comment = false;
+
+        while(true) {
+            while(this.peek() == '/' && this.peekNext() == '*') {
+                in_comment = true;
+                this.advance(2);
+            }
+
+            if (this.peek() == '*' && this.peekNext() == '/' && !this.isAtEnd()) {
+                in_comment = false;
+                this.advance(2);
+                break;
+            }
+
+            if (this.isAtEnd()) {
+                break;
+            }
+
+            this.advance();
+        }
+
+        if (this.isAtEnd() && in_comment) {
+            EzFlowScriptApplication.error(this.line, "Dangling comment");
+        }
+
+    }
+
+    private void identifer() {
+        while(this.isAlphaNumeric(this.peek())) {
+            this.advance();
+        }
+
+        String text = this.source.substring(this.start, this.current);
+        TokenType type = (TokenType)keywords.get(text);
+        if (type == null) {
+            type = TokenType.IDENTIFIER;
+        }
+
+        this.addToken(type);
+    }
+
+    private void number() {
+        while(this.isDigit(this.peek())) {
+            this.advance();
+        }
+
+        if (this.peek() == '.' && this.isDigit(this.peekNext())) {
+            this.advance();
+
+            while(this.isDigit(this.peek())) {
+                this.advance();
+            }
+        }
+
+        this.addToken(TokenType.NUMBER, Double.parseDouble(this.source.substring(this.start, this.current)));
+    }
+
+    private void string() {
+        for(; this.peek() != '"' && !this.isAtEnd(); this.advance()) {
+            if (this.peek() == '\n') {
+                ++this.line;
+            }
+        }
+
+        if (this.isAtEnd()) {
+            EzFlowScriptApplication.error(this.line, "Unterminated String");
+        } else {
+            this.advance();
+            String value = this.source.substring(this.start + 1, this.current - 1);
+            this.addToken(TokenType.STRING, value);
+        }
+    }
+
+    private boolean match(char expected) {
+        if (this.isAtEnd()) {
+            return false;
+        } else if (this.source.charAt(this.current) != expected) {
+            return false;
+        } else {
+            ++this.current;
+            return true;
+        }
+    }
+
+    private char peek() {
+        return this.isAtEnd() ? '\u0000' : this.source.charAt(this.current);
+    }
+
+    private char peekNext() {
+        return this.current + 1 >= this.source.length() ? '\u0000' : this.source.charAt(this.current + 1);
+    }
+
+    private boolean isAlpha(char c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_';
+    }
+
+    boolean isAlphaNumeric(char c) {
+        return this.isAlpha(c) || this.isDigit(c);
+    }
+
+    private boolean isDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
+    private boolean isAtEnd() {
+        return this.current >= this.source.length();
+    }
+
+    private char advance() {
+        return this.source.charAt(this.current++);
+    }
+
+    private char advance(int steps) {
+        this.current += steps;
+        return this.source.charAt(this.current);
+    }
+
+    private void addToken(TokenType type) {
+        this.addToken(type, (Object)null);
+    }
+
+    private void addToken(TokenType type, Object literal) {
+        String text = this.source.substring(this.start, this.current);
+        this.tokens.add(new Token(type, text, literal, this.line));
+    }
+
     static {
-        keywords = new HashMap<>();
         keywords.put("and", TokenType.AND);
         keywords.put("class", TokenType.CLASS);
         keywords.put("else", TokenType.ELSE);
@@ -30,229 +253,5 @@ public class Scanner {
         keywords.put("true", TokenType.TRUE);
         keywords.put("var", TokenType.VAR);
         keywords.put("while", TokenType.WHILE);
-    }
-
-    Scanner(String source) {
-        this.source = source;
-    }
-
-    List<Token> scanTokens() {
-        while (!isAtEnd()) {
-            // we are at the beginning of the next lexeme.
-            start = current;
-            scanToken();
-        }
-
-        tokens.add(new Token(TokenType.EOF, "", null, line));
-        return tokens;
-    }
-
-    private void scanToken() {
-        char c = advance();
-        switch (c) {
-            case '(':
-                addToken(TokenType.LEFT_PAREN);
-                break;
-            case ')':
-                addToken(TokenType.RIGHT_PAREN);
-                break;
-            case '{':
-                addToken(TokenType.LEFT_BRACE);
-                break;
-            case '}':
-                addToken(TokenType.RIGHT_BRACE);
-                break;
-            case ',':
-                addToken(TokenType.COMMA);
-                break;
-            case '.':
-                addToken(TokenType.DOT);
-                break;
-            case '-':
-                addToken(TokenType.MINUS);
-                break;
-            case '+':
-                addToken(TokenType.PLUS);
-                break;
-            case ';':
-                addToken(TokenType.SEMICOLON);
-                break;
-            case '*':
-                addToken(TokenType.STAR);
-                break;
-            case '!':
-                addToken(match('=') ? TokenType.BANG_EQUAL : TokenType.BANG);
-                break;
-            case '=':
-                addToken(match('=') ? TokenType.EQUAL_EQUAL : TokenType.EQUAL);
-                break;
-            case '<':
-                addToken(match('=') ? TokenType.LESS_EQUAL : TokenType.LESS);
-                break;
-            case '>':
-                addToken(match('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER);
-                break;
-            case '/':
-                if (match('/')) {
-                    // A comment goes until the end of the line.
-                    while (peek() != '\n' && !isAtEnd())
-                        advance();
-                } else if (match('*')) {
-                    // A C style comment /*...*/
-                    ccoment();
-                } else {
-                    addToken(TokenType.SLASH);
-                }
-                break;
-
-            case ' ':
-            case '\r':
-            case '\t':
-                // ignore whitespace
-                break;
-
-            case '\n':
-                line++;
-                break;
-            case '"':
-                string();
-                break;
-
-            default:
-                if (isDigit(c)) {
-                    number();
-                } else if (isAlpha(c)) {
-                    identifer();
-                } else {
-                    EzFlowScriptApplication.error(line, "Unexpected Character");
-                }
-                break;
-        }
-    }
-    /* hello /* */
-    private void ccoment() {
-        boolean in_comment = false;
-        while (true) {
-            if (peek() == '/' && peekNext() == '*') {
-                in_comment = true;
-                advance(2);
-            } else if (peek() == '*' && peekNext() == '/' && !isAtEnd()) {
-                in_comment = false;
-                advance(2);
-                break;
-            }else if (isAtEnd()) {
-                break;
-            }
-            else {
-                advance();
-            }
-        }
-        if (isAtEnd() && in_comment) {
-            EzFlowScriptApplication.error(line, "Dangling comment");
-        }
-    }
-    private void identifer() {
-        while (isAlphaNumeric(peek()))
-            advance();
-
-        String text = source.substring(start, current);
-        TokenType type = keywords.get(text);
-        if (type == null)
-            type = TokenType.IDENTIFIER;
-        addToken(type);
-
-    }
-
-    private void number() {
-        while (isDigit(peek()))
-            advance();
-        // Look for a fractional part
-
-        if (peek() == '.' && isDigit(peekNext())) {
-            // consume the "."
-            advance();
-
-            while (isDigit(peek()))
-                advance();
-        }
-
-        addToken(TokenType.NUMBER,
-                Double.parseDouble(source.substring(start, current)));
-    }
-
-    private void string() {
-        while (peek() != '"' && !isAtEnd()) {
-            if (peek() == '\n')
-                line++;
-            advance();
-        }
-
-        if (isAtEnd()) {
-            EzFlowScriptApplication.error(line, "Unterminated String");
-            return;
-        }
-
-        // the closing ".
-        advance();
-
-        // Trim the surrounding quotes
-        String value = source.substring(start + 1, current - 1);
-        addToken(TokenType.STRING, value);
-    }
-
-    private boolean match(char expected) {
-        if (isAtEnd())
-            return false;
-        if (source.charAt(current) != expected)
-            return false;
-
-        current++;
-        return true;
-    }
-
-    private char peek() {
-        if (isAtEnd())
-            return '\0';
-        return source.charAt(current);
-    }
-
-    private char peekNext() {
-        if (current + 1 >= source.length())
-            return '\0';
-        return source.charAt(current + 1);
-    }
-
-    private boolean isAlpha(char c) {
-        return (c >= 'a' && c <= 'z') ||
-                (c >= 'A' && c <= 'Z') ||
-                c == '_';
-    }
-
-    boolean isAlphaNumeric(char c) {
-        return isAlpha(c) || isDigit(c);
-    }
-
-    private boolean isDigit(char c) {
-        return c >= '0' && c <= '9';
-    }
-
-    private boolean isAtEnd() {
-        return current >= source.length();
-    }
-
-    private char advance() {
-        return source.charAt(current++);
-    }
-    private char advance(int steps) {
-        current+=steps;
-        return source.charAt(current);
-    }
-    private void addToken(TokenType type) {
-        addToken(type, null);
-    }
-
-    private void addToken(TokenType type, Object literal) {
-        String text = source.substring(start, current);
-        tokens.add(new Token(type, text, literal, line));
     }
 }
